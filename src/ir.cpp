@@ -1,10 +1,8 @@
 #include <Arduino.h>
-#include <assert.h>
 #include <IRSend.h>
 #include <IRRecv.h>
 #include <Wire.h>
 #include <WiFi.h>
-//#include <WiFiClient.h>
 #include "Adafruit_MQTT.h"
 #include "Adafruit_MQTT_Client.h"
 
@@ -16,7 +14,7 @@
 #define AIO_SERVER      "io.adafruit.com"
 #define AIO_SERVERPORT  1883                   // use 8883 for SSL
 #define AIO_USERNAME    "testecontpeople"
-#define AIO_KEY         "aio_VGsA42VBLyCz4SvEZ6JEyTtN0ghP"
+#define AIO_KEY         "aio_cWqO57at4fgs6Aw4EMhVSY62S36q"
 
 
 WiFiClient client;
