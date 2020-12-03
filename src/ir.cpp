@@ -20,6 +20,7 @@
 
 
 WiFiClient client;
+// Configuração adafruit
 Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
 Adafruit_MQTT_Publish infraver = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/infraver");
 
