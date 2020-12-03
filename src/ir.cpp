@@ -12,7 +12,7 @@
 /************************* Adafruit.io Setup *********************************/
 
 #define AIO_SERVER      "io.adafruit.com"
-#define AIO_SERVERPORT  1883                   // use 8883 for SSL
+#define AIO_SERVERPORT  1883                
 #define AIO_USERNAME    "testecontpeople"
 #define AIO_KEY         "aio_cWqO57at4fgs6Aw4EMhVSY62S36q"
 
@@ -39,7 +39,6 @@ IRRecv receptorB(RMT_CHANNEL_3);
 void MQTT_connect() {
   int8_t ret;
 
-  // Stop if already connected.
   if (mqtt.connected()) {
     return;
   }
@@ -47,14 +46,13 @@ void MQTT_connect() {
   Serial.print("Connecting to MQTT... ");
 
   uint8_t retries = 3;
-  while ((ret = mqtt.connect()) != 0) { // connect will return 0 for connected
+  while ((ret = mqtt.connect()) != 0) { 
        Serial.println(mqtt.connectErrorString(ret));
        Serial.println("Retrying MQTT connection in 5 seconds...");
        mqtt.disconnect();
-       delay(5000);  // wait 5 seconds
+       delay(5000);
        retries--;
        if (retries == 0) {
-         // basically die and wait for WDT to reset me
          while (1);
        }
   }
