@@ -1,0 +1,76 @@
+#include <Arduino.h>
+#include <assert.h>
+#include <IRSend.h>
+#include <IRRecv.h>
+#include <Wire.h>
+const uint16_t pinoirent = 19;    
+// Pino de ligacao do sensor IR de saida
+const uint16_t pinoirsaida = 5;  
+// Variavel que registra o estado do sensor de entrada
+const uint16_t valorirent = 0;   
+// Variavel que registra o estado do sensor de saida
+const uint16_t valorirsai = 0;   
+// Variavel que registra a quantidade de visitantes que entraram
+const uint16_t content = 0;      
+// Variavel que registra a quantidade de visitantes que sairam
+const uint16_t contsai = 0;      
+// Variavel que registra a quantidade de pessoas na sala
+const uint16_t contsala = 0;     
+// Variavel que registra a quantidade anterior de pessoas na sala
+const uint16_t contanterior = 0; 
+// Pino de ligacao do led que representa a luz da sala
+const uint16_t pinoledsala = 2; 
+
+void loop()
+{
+  // Seta a variavel valorirent com o status do sensor de entrada
+  const uint16_t valorirent = digitalRead(pinoirent);    
+  // Seta a variavel valorirsai com o status do sensor de saida
+  const uint16_t valorirsai = digitalRead(pinoirsaida);  
+  // Mostra as informacoes dos sensores no serial monitor
+  Serial.print("entrada : ");
+  Serial.print(valorirent);
+  Serial.print(" saida : ");
+  Serial.println(valorirsai);
+  // Verifica se o estado do sensor de entrada foi alterado
+  if(valorirent!=1) 
+  {
+    // Incrementa o valor do contador de entrada em 1 unidade
+   const uint16_t content=content+1; 
+    // Verifica se a pessoa/objeto para em frente ao sensor
+    while(digitalRead(pinoirent)!=1) 
+      { 
+        delay(100);  
+        Serial.println("Sensor de entrada parado !");
+      }
+  }
+  // Verifica se o estado do sensor de saida foi alterado
+  if(valorirsai!=1) 
+  {
+    // Incrementa o valor do contador de saida em 1 unidade
+    const uint16_t contsai=contsai+1; 
+    // Verifica se a pessoa/objeto para em frente ao sensor
+    while(digitalRead(pinoirsaida)!=1)
+      { 
+       delay(100); 
+       Serial.println("Sensor de saida parado !");
+      } 
+  }
+  // Calcula o numero de visitantes na sala
+  const uint16_t contsala=content-contsai; 
+  // Verifica se o numero atual de visitantes na sala foi alterado.
+  if (contsala != contanterior)
+  {
+   //const uint16_t contanterior = contsala; 
+    if (contsala > 0) 
+    {
+      //Caso positivo, acende a luz/led
+      digitalWrite(pinoledsala,1); 
+    }
+      else
+    { 
+      //Caso negativo, apaga a luz/led
+      digitalWrite(pinoledsala,0); 
+    } 
+  }
+}
