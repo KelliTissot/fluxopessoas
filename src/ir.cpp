@@ -5,6 +5,8 @@
 #include <WiFi.h>
 #include "Adafruit_MQTT.h"
 #include "Adafruit_MQTT_Client.h"
+#include <Adafruit_MLX90614.h>
+
 
 #define WIFI_SSID       "VETORIAL_231_202"
 #define WIFI_PASS       "querocafe"
@@ -14,19 +16,20 @@
 #define AIO_SERVER      "io.adafruit.com"
 #define AIO_SERVERPORT  1883                
 #define AIO_USERNAME    "testecontpeople"
-#define AIO_KEY         "aio_cWqO57at4fgs6Aw4EMhVSY62S36q"
+#define AIO_KEY         "aio_odud255iLf6uQuB1M2niarQG5qCq"
 
 
 WiFiClient client;
 // Configuração adafruit
 Adafruit_MQTT_Client mqtt(&client, AIO_SERVER, AIO_SERVERPORT, AIO_USERNAME, AIO_KEY);
 Adafruit_MQTT_Publish infraver = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/infraver");
+Adafruit_MQTT_Publish temperatura = Adafruit_MQTT_Publish(&mqtt, AIO_USERNAME "/feeds/temperatura");
 
-
-const uint16_t pinLedA = 2;
-const uint16_t pinLedB = 4;
-const uint16_t pinSensorA = 19;
-const uint16_t pinSensorB = 5;
+Adafruit_MLX90614 mlx = Adafruit_MLX90614();
+const uint16_t pinLedA = 4;
+const uint16_t pinLedB = 19;
+const uint16_t pinSensorA = 5;
+const uint16_t pinSensorB = 17;
 uint32_t senhaA = 0xE1411111;
 uint32_t senhaB = 0xE1499999;
 
@@ -83,16 +86,19 @@ void setup() {
   receptorA.start(pinSensorA);
   receptorB.start(pinSensorB);
   ConnectWifi();
+  mlx.begin();  
 }
 
-boolean recebeu(IRRecv *recv, IRSend *led, uint32_t senha){
-  led->send(senha);
+boolean recebeu(IRRecv *recv, uint32_t senha){
+  
   boolean res  = false;
   while(recv->available()){
     char* rcvGroup;
     uint32_t result = recv->read(rcvGroup);
     if (result == senha) {
         res = true;
+    }else if(result!=0){
+      Serial.println(String("Senha errada:") + result);
     }
   }  
   return res;
@@ -103,8 +109,18 @@ struct Estado{
   boolean anterior;
 };
 
+enum Ordem{
+  E1,
+  E2,
+  E3,
+  E4,
+};
+
 Estado alguemNaFrenteA;
 Estado alguemNaFrenteB;
+int pessoasDentro=0;
+float temperaturaPessoa=0;
+Ordem vet[] = {E1, E1, E1, E1, E1};
 
 
 boolean trocouEstado(Estado *estado){
@@ -120,14 +136,16 @@ void printEstado(Estado est){
   Serial.print(est.anterior);
   Serial.print("Agora:");
   Serial.println(est.agora);
+  Serial.print("*C\tCorporal: "); Serial.print(mlx.readObjectTempC()); Serial.println("*C");
+  Serial.println();
 }
 
-int contPessoas=0, A=0, B=0;
+int A=0, B=0;
 uint32_t naoRecebeuACont = 0, naoRecebeuBCont = 0;
 boolean atualizouEstado=true;
 
 void printa(){
-  Serial.printf("A: %d, B: %d | cont: %d\n", A, B, contPessoas);
+  Serial.printf("A: %d, B: %d | pessoas: %d\n", A, B, pessoasDentro);
 }
 
 boolean precisaPublicar=true;
@@ -137,59 +155,132 @@ void publicaAdafruit(){
   uint64_t agora = millis();
   if(precisaPublicar && agora > ultimaPublicacao + 2000){
     precisaPublicar = false;
-    infraver.publish(contPessoas);
+    infraver.publish(pessoasDentro);
+    temperatura.publish(mlx.readObjectTempC());
     ultimaPublicacao = millis();
   }
 }
 
-boolean ePar(uint32_t num){
-  return num % 2 == 0;
+Ordem ordem=E1;
+
+const char* stringOrdem(Ordem ord){
+  switch (ord)
+  {
+  case E1:
+    return "E1";
+  case E2:
+    return "E2";
+  case E3:
+    return "E3";
+  case E4:
+    return "E4";
+  }
+}
+
+void checaOrdem(){
+  boolean XA = alguemNaFrenteA.agora;
+  boolean XB = alguemNaFrenteB.agora;
+  Ordem anterior = ordem;
+  switch (ordem)
+  {
+  case E1:
+      if(XA==true){
+        ordem=E2;
+      }else if(XB==true){
+        ordem=E3;
+      };
+    break;
+  case E2:
+    if(XA==false){
+      ordem=E1;
+    }else if(XB==true){
+      ordem=E4;
+    }
+    break;
+  case E3:
+    if(XA==true){
+      ordem=E4;
+    }else if(XB==false){
+      ordem=E1;
+    }
+    break;
+  case E4:
+    if(XA==false){
+      ordem=E3;
+    }else if(XB==false){
+      ordem=E2;
+    }
+    break;
+  }
+  if(ordem != anterior){
+    int i;
+    // Salva ordem atual no vet  na ultima posição
+    for(i=0; i<4; i++){
+      vet[i]=vet[i+1];
+    }
+    vet[4]=ordem;
+
+    if(vet[0]==E1 && vet[1]==E2 && vet[2]==E4  && vet[3]==E3  && vet[4]==E1 ){
+      Serial.println("Entrou!");
+      pessoasDentro++;
+    }else if(vet[0]==E1 && vet[1]==E3 && vet[2]==E4  && vet[3]==E2  && vet[4]==E1 ){
+      Serial.println("Saiu!");
+      pessoasDentro--;
+    }
+
+    Serial.println(String("Ordem ") + stringOrdem(anterior) + " -> " + stringOrdem(ordem));
+  }
 }
 
 void loop() {
-  if(recebeu(&receptorA, &ledA, senhaA)){
+  ledA.send(senhaA);
+  ledA.send(senhaA);
+  ledB.send(senhaB);
+  ledB.send(senhaB);
+
+  
+  
+
+  if(recebeu(&receptorA, senhaA)){
     naoRecebeuACont=0;
     alguemNaFrenteA.agora = false;
   }else{
     naoRecebeuACont++;
     // Conta somente se não recebeu sinal por duas vezes consecutivas
-    if(naoRecebeuACont>3){
+    if(naoRecebeuACont>1){
       alguemNaFrenteA.agora = true;
     }
   }
 
-  if(recebeu(&receptorB, &ledB, senhaB)){
+  if(recebeu(&receptorB, senhaB)){
     naoRecebeuBCont=0;
     alguemNaFrenteB.agora = false;
   }else{
     naoRecebeuBCont++;
-    if(naoRecebeuBCont>3){
+    if(naoRecebeuBCont>1){
       alguemNaFrenteB.agora = true;
     }
   }
 
   if(trocouEstado(&alguemNaFrenteA)){
     A++;
-    if(ePar(A)){
-      contPessoas++;
-    }
+    
     atualizouEstado=true;
   }
   if(trocouEstado(&alguemNaFrenteB)){
     B++;
-    
-    if(ePar(B)){
-      contPessoas--;
-    }
+
     atualizouEstado=true;
   }
   MQTT_connect();
+  checaOrdem();
   if(atualizouEstado){
     atualizouEstado =false;
     printa();
     precisaPublicar = true;
   }
   publicaAdafruit();
+  
   //printEstado(alguemNaFrenteA);
   //delay(100);
 }
